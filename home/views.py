@@ -4,7 +4,7 @@ from django.shortcuts import render
 import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
-
+import re
 
 # Create your views here.
 def connectdb():
@@ -12,7 +12,57 @@ def connectdb():
     db_name = client["mydb"]
     collection=db_name['data']
     return client,db_name,collection
+
+
 num=0
+
+flist={'RAM':'','ROM':'','color':'','Camera':'','Battery':'','Processor':'','Year':'','Display':''}
+    
+
+def parse_name(raw_name,flist):
+    flist=flist
+    name,color,rom='', '',  ''
+    if '(' in raw_name:
+        pos=raw_name.index('(')
+        name=raw_name[:pos]
+        if ',' in raw_name:
+            pos2=raw_name.index(',') 
+            color=raw_name[pos+1:pos2] 
+            rom=raw_name[pos2+1:len(raw_name)-1]
+        elif 'GB' not in raw_name:
+            pos2=raw_name.index(')')
+            color=raw_name[pos+1:pos2] 
+    flist['color']=color
+    flist['ROM']=rom
+    return name,flist
+
+
+#feature_list has the whole raw description RAM,ROM,camera etc
+def get_features(feature_list):
+    #seperate all raw features with 'li'  
+    lst=feature_list.find_all('li')
+    #extract feature texts from raw
+    newlst=[]
+    for i in lst:
+        newlst.append(i.text)
+    templist=['Display','Camera','Battery','Processor','Year']
+    
+    for f in newlst:
+        #extract RAM ROM
+        if 'RAM' in f:
+            x=newlst[newlst.index(f)].split()
+            rampos=x.index('RAM')
+            flist['RAM'] =  x[rampos-2]
+            if 'ROM' in f:
+                rompos=x.index('ROM')
+                flist['ROM'] =  x[rompos-2]
+        #extract all other features
+        for i in templist:
+            if i in f:
+                flist[i]=newlst[newlst.index(f)]
+    return flist
+
+
 def scrape_data(collection): 
     # client,db_name,collection = connectdb()
     for num in range(1,42): #there is just 41 page content for phones on flipkart
@@ -21,13 +71,15 @@ def scrape_data(collection):
         soup=BeautifulSoup(response.content,'html.parser')
         phones=soup.find_all('div',class_="_3pLy-c row")
         for phone in phones:
+            flist={'RAM':'','ROM':'','color':'','Camera':'','Battery':'','Processor':'','Year':'','Display':''}
             mydict={}
-            name1=phone.find('div',class_='_4rR01T').text
-            name,color,rom=parse_name(name1)
+            raw_name=phone.find('div',class_='_4rR01T').text
+            name,flist=parse_name(raw_name,flist)
             rating=phone.find('div',class_='_3LWZlK')
             r=rating.text if rating is not None else ''
-            price=phone.find('div',class_='_30jeq3 _1_WHN1').text #'_30jeq3 _1_WHN1'
-            featurelst=phone.find('div',class_='fMghEO').text
+            price=phone.find('div',class_='_30jeq3 _1_WHN1').text
+            price=''.join(re.findall('\d',price))
+            featurelst=phone.find('div',class_='fMghEO')
             features=get_features(featurelst)
             mydict['name']=name
             mydict['rating']=r
@@ -37,9 +89,9 @@ def scrape_data(collection):
             print('inserted ',name)
     return collection.find()
 
-def get_features(feature_list):
-    return
-
+# def get_features(feature_list):
+#     return
+'''
 def parse_name(name1):
     if '(' in name1:
         pos=name1.index('(')
@@ -49,7 +101,7 @@ def parse_name(name1):
                 color=name1[pos+1:pos2] 
                 rom=name1[pos2+1:len(name1)-1] 
     return name, color,rom
-
+'''
 
 def scrapeview(request):
     client,db_name,collection = connectdb()
