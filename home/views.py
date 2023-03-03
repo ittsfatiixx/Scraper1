@@ -32,6 +32,8 @@ def parse_name(raw_name,flist):
         elif 'GB' not in raw_name:
             pos2=raw_name.index(')')
             color=raw_name[pos+1:pos2] 
+    else:
+        name=raw_name
     flist['color']=color
     flist['ROM']=rom
     return name,flist
@@ -77,7 +79,8 @@ def scrape_data(collection):
             name,flist=parse_name(raw_name,flist)
             rating=phone.find('div',class_='_3LWZlK')
             r=rating.text if rating is not None else ''
-            price=phone.find('div',class_='_30jeq3 _1_WHN1').text
+            p=phone.find('div',class_='_30jeq3 _1_WHN1')
+            price=p.text if p is not None else ''
             price=''.join(re.findall('\d',price))
             featurelst=phone.find('div',class_='fMghEO')
             features=get_features(featurelst)
@@ -88,6 +91,9 @@ def scrape_data(collection):
             collection.insert_one(mydict)
             print('inserted ',name)
     return collection.find()
+
+#  _3G6awp   for currently unavailable phones
+
 
 # def get_features(feature_list):
 #     return
